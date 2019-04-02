@@ -61,6 +61,7 @@ namespace Ginseng.Mvc.Pages.Dashboard
 
 		// used when single project is displayed
 		public ProjectInfoResult SelectedProjectInfo { get; set; }
+		public IEnumerable<Comment> ProjectComments { get; set; }
 
 		public int CrosstabRowHeadingGridCols()
 		{
@@ -115,6 +116,7 @@ namespace Ginseng.Mvc.Pages.Dashboard
 			{
 				SelectedProject = await Data.FindAsync<Project>(Id.Value);
 				SelectedProjectInfo = await new ProjectInfo() { Id = Id, OrgId = OrgId }.ExecuteSingleAsync(connection);
+				ProjectComments = await new Comments() { OrgId = OrgId, ObjectType = ObjectType.Project, ObjectIds = new int[] { Id.Value } }.ExecuteAsync(connection);
 			}
 			else
 			{
