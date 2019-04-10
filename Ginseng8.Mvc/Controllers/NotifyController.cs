@@ -7,12 +7,12 @@ namespace Ginseng.Mvc.Controllers
 	public class NotifyController : Controller
 	{
 		private readonly DataAccess _data;
-		private readonly Email _email;
+		private readonly EmailService _email;
 
 		public NotifyController(IConfiguration config)
 		{
 			_data = new DataAccess(config);
-			_email = new Email(config);
+			_email = new EmailService(config);
 		}
 	}
 }
