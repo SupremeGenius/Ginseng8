@@ -14,12 +14,13 @@ namespace Ginseng.Mvc.Services
 
 		public IdentityEmailSender(IConfiguration config)
 		{
+			// constructor gets hit as expected during controller lifecycle
 			_emailService = new EmailService(config);
 		}
 
 		public async Task SendEmailAsync(string email, string subject, string htmlMessage)
 		{
-			// not ever getting called
+			// but this method is not getting called
 			await _emailService.SendAsync(email, subject, htmlMessage, htmlMessage);
 		}
 	}
