@@ -5,6 +5,9 @@ using System.Threading.Tasks;
 
 namespace Ginseng.Mvc.Services
 {
+	/// <summary>
+	/// Low-level SendGrid integration used both standalone and by IdentityEmailSender
+	/// </summary>
 	public class EmailService
 	{
 		private readonly string _apiKey;

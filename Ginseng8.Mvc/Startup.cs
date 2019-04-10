@@ -48,8 +48,8 @@ namespace Ginseng.Mvc
 					options.ClientSecret = Configuration.GetSection("Google").GetValue<string>("ClientSecret");
 				});
 
-			services.AddTransient<IEmailSender, EmailSender>();
-			services.Configure<AuthMessageSenderOptions>(Configuration);
+			services.AddTransient<IEmailSender, IdentityEmailSender>();
+			//services.Configure<AuthMessageSenderOptions>(Configuration); // is this needed?
 
 			services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 		}
