@@ -3,7 +3,6 @@ using Ginseng.Mvc.Classes;
 using Ginseng.Mvc.Queries;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
-using Postulate.SqlServer.IntKey;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -18,7 +17,7 @@ namespace Ginseng.Mvc.Pages.Roadmap
 		}
 
 		public Application Application { get; set; }
-		public IEnumerable<Milestone> Milestones { get; set; }				
+		public IEnumerable<Milestone> Milestones { get; set; }
 		public Dictionary<RoadmapCell, AppMilestone> AppMilestones { get; set; }
 
 		public bool IsMilestoneOnRoadmap(int milestoneId)
@@ -50,7 +49,7 @@ namespace Ginseng.Mvc.Pages.Roadmap
 		{
 			using (var cn = Data.GetConnection())
 			{
-				Milestones = await new Milestones() { OrgId = OrgId }.ExecuteAsync(cn);				
+				Milestones = await new Milestones() { OrgId = OrgId }.ExecuteAsync(cn);
 
 				var cells = await new AppMilestones() { OrgId = OrgId, AppId = CurrentOrgUser.CurrentAppId }.ExecuteAsync(cn);
 				AppMilestones = cells.ToDictionary(row => new RoadmapCell(row.ApplicationId, row.MilestoneId));
