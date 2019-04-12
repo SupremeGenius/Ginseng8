@@ -2,6 +2,8 @@
 using Ginseng.Mvc.Classes;
 using Ginseng.Mvc.Queries;
 using Microsoft.Extensions.Configuration;
+using Postulate.SqlServer.IntKey;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
@@ -14,16 +16,40 @@ namespace Ginseng.Mvc.Pages.Roadmap
 		{
 		}
 
-		public IEnumerable<Milestone> Milestones { get; set; }
-		public IEnumerable<Application> Applications { get; set; }
+		public Application Application { get; set; }
+		public IEnumerable<Milestone> Milestones { get; set; }				
 		public Dictionary<RoadmapCell, AppMilestone> AppMilestones { get; set; }
+
+		public bool IsMilestoneOnRoadmap(int milestoneId)
+		{
+			var cell = new RoadmapCell(CurrentOrgUser.CurrentAppId ?? 0, milestoneId);
+			return (AppMilestones.ContainsKey(cell) && AppMilestones[cell].OnRoadmap);
+		}
+
+		public IEnumerable<Milestone> ActiveMilestones()
+		{
+			return GetMilestones((cell) => AppMilestones.ContainsKey(cell));
+		}
+
+		public IEnumerable<Milestone> InactiveMilestones()
+		{
+			return GetMilestones((cell) => !AppMilestones.ContainsKey(cell));
+		}
+
+		private IEnumerable<Milestone> GetMilestones(Func<RoadmapCell, bool> predicate)
+		{
+			return Milestones.Where(ms =>
+			{
+				var cell = new RoadmapCell(CurrentOrgUser.CurrentAppId ?? 0, ms.Id);
+				return predicate.Invoke(cell);
+			});
+		}
 
 		public async Task OnGetAsync()
 		{
 			using (var cn = Data.GetConnection())
 			{
-				Milestones = await new Milestones() { OrgId = OrgId }.ExecuteAsync(cn);
-				Applications = await new Applications() { OrgId = OrgId, IsActive = true, Id = CurrentOrgUser.CurrentAppId }.ExecuteAsync(cn);
+				Milestones = await new Milestones() { OrgId = OrgId }.ExecuteAsync(cn);				
 
 				var cells = await new AppMilestones() { OrgId = OrgId, AppId = CurrentOrgUser.CurrentAppId }.ExecuteAsync(cn);
 				AppMilestones = cells.ToDictionary(row => new RoadmapCell(row.ApplicationId, row.MilestoneId));

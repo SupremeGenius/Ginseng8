@@ -35,6 +35,6 @@ namespace Ginseng.Mvc.Queries
 		public bool? HasOpenWorkItems { get; set; }
 
 		[Where("EXISTS(SELECT 1 FROM [dbo].[WorkItem] WHERE [MilestoneId]=[ms].[Id] AND [ApplicationId]=@withProjectsForAppId AND [ProjectId] IS NOT NULL AND [CloseReasonId] IS NULL)")]
-		public int? WithProjectsForAppId { get; set; }
+		public int? WithProjectsForAppId { get; set; }		
 	}
 }

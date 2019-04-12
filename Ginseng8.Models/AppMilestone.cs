@@ -1,14 +1,13 @@
 ﻿using Ginseng.Models.Conventions;
-using Ginseng.Models.Interfaces;
 using Postulate.Base.Attributes;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace Ginseng.Models
 {
 	/// <summary>
-	/// Describes high-level business objectives for an application at a given milestone
+	/// Controls visibility of milestone on Roadmap page
 	/// </summary>
-	public class AppMilestone : BaseTable, IBody
+	public class AppMilestone : BaseTable
 	{
 		[References(typeof(Application))]
 		[PrimaryKey]
@@ -18,9 +17,8 @@ namespace Ginseng.Models
 		[PrimaryKey]
 		public int MilestoneId { get; set; }
 
-		public string TextBody { get; set; }
-
-		public string HtmlBody { get; set; }
+		[DefaultExpression("1")]
+		public bool OnRoadmap { get; set; } = true;
 
 		[NotMapped]
 		public string ApplicationName { get; set; }
