@@ -1,6 +1,7 @@
 ﻿using Ginseng.Models;
 using Ginseng.Mvc.Classes;
 using Ginseng.Mvc.Queries;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Postulate.SqlServer.IntKey;
 using System;
@@ -28,12 +29,12 @@ namespace Ginseng.Mvc.Pages.Roadmap
 
 		public IEnumerable<Milestone> ActiveMilestones()
 		{
-			return GetMilestones((cell) => AppMilestones.ContainsKey(cell));
+			return GetMilestones((cell) => AppMilestones.ContainsKey(cell) && AppMilestones[cell].OnRoadmap);
 		}
 
 		public IEnumerable<Milestone> InactiveMilestones()
 		{
-			return GetMilestones((cell) => !AppMilestones.ContainsKey(cell));
+			return GetMilestones((cell) => !AppMilestones.ContainsKey(cell) || !AppMilestones[cell].OnRoadmap);
 		}
 
 		private IEnumerable<Milestone> GetMilestones(Func<RoadmapCell, bool> predicate)
@@ -54,6 +55,16 @@ namespace Ginseng.Mvc.Pages.Roadmap
 				var cells = await new AppMilestones() { OrgId = OrgId, AppId = CurrentOrgUser.CurrentAppId }.ExecuteAsync(cn);
 				AppMilestones = cells.ToDictionary(row => new RoadmapCell(row.ApplicationId, row.MilestoneId));
 			}
+		}
+
+		public async Task<IActionResult> OnPostToggleMilestoneAsync(int id, bool selected)
+		{
+			var appId = CurrentOrgUser.CurrentAppId.Value;
+			var appMs = await Data.FindWhereAsync<AppMilestone>(new { ApplicationId = appId, MilestoneId = id })
+				?? new AppMilestone() { ApplicationId = appId, MilestoneId = id };
+			appMs.OnRoadmap = selected;
+			await Data.TrySaveAsync(appMs);
+			return RedirectToPage("/Roadmap/Index");
 		}
 	}
 }

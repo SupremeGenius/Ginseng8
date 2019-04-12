@@ -19,11 +19,13 @@
 <div class="dropdown-menu">
     @foreach (var ms in Model.Milestones)
     {        
-        <form method="post">            
-            <input type="hidden" name="MilestoneId" value="@ms.Id"/>
+        <form method="post" asp-page-handler="ToggleMilestone">
+            <input type="hidden" name="Id" value="@ms.Id"/>
             <a class="dropdown-item roadmapMilestone">
-                @Html.CheckBox("selected", Model.IsMilestoneOnRoadmap(ms.Id), new { @class = "milestoneCheckbox" })                
-                <span>@ms.Name - @Html.FormatValue(ms.Date, "{0:M/d/yy}")</span>
+                <label>
+                    @Html.CheckBox("selected", Model.IsMilestoneOnRoadmap(ms.Id), new { @class = "milestoneCheckbox", onclick = "this.form.submit();" })                
+                    <span>@ms.Name - @Html.FormatValue(ms.Date, "{0:M/d/yy}")</span>
+                </label>                
             </a>
         </form>                            
     }
