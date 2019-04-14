@@ -114,7 +114,16 @@ $(document)
     });
 
 $('#accordion').on('show.bs.collapse', function (ev) {
-    console.log('show card ' + $(ev.target).data('id'));
+    var id = $(ev.target).data('id')
+    console.log('show card ' + id);
+    fetch('/WorkItem/LoadCardBody', {
+        method: 'post',
+        body: $('#item-data-' + id).html()
+    }).then(function (response) {
+        return response.text();
+    }).then(function (html) {
+        $('#item-body-' + id).html(html);
+    });
 });
 
 $('.htmlEditor').on('froalaEditor.image.beforeUpload', function(event, editor, images) {

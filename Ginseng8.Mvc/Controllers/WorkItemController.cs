@@ -274,5 +274,13 @@ namespace Ginseng.Mvc.Controllers
 				return Json(new { success = false, message = exc.Message });
 			}
 		}
+
+		[HttpPost]
+		public async Task<PartialViewResult> LoadCardBody()
+		{
+			string json = await Request.ReadStringAsync();
+			WorkItemCardView model = JsonConvert.DeserializeObject<WorkItemCardView>(json);
+			return PartialView("/Dashboard/Items/_ItemInner.cshtml", model);
+		}
 	}
 }
