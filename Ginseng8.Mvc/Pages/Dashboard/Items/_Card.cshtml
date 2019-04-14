@@ -15,9 +15,14 @@
             </div>
         </div>
     </div>
-    <div class="collapse" id="item-@Model.WorkItem.Id" data-parent="#@(Model.AccordionElement)">
+    <div class="collapse" id="item-@Model.WorkItem.Id" data-parent="#@(Model.AccordionElement)" data-id="@Model.WorkItem.Id">
         <div class="card card-body">
-            <partial name="Dashboard/Items/_ItemInner" model="Model"/>
+            <script type="application/json" id="item-data-@Model.WorkItem.Id">                
+                @Html.Raw(@Newtonsoft.Json.JsonConvert.SerializeObject(Model))                                
+            </script>
+            <div id="item-body-@Model.WorkItem.Id">
+            @* <partial name="Dashboard/Items/_ItemInner" model="Model"/> *@
+            </div>
         </div>
     </div>
 </div>
