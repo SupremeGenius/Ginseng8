@@ -6,37 +6,64 @@
 
 <h4>Feed</h4>
 
+@if (!Model.CurrentOrgUser.CurrentAppId.HasValue)
+{
+    <p>Please select an App above.</p>
+    return;
+}
+
 <div class="row">
-    <div class="col-3">
-        <ul>
-            @foreach (var ev in Model.Events)
-            {
-                <li>
-                    <label>
-                        @Html.CheckBox("Visible", Model.Subscriptions[ev.Id].Visible)
-                        @ev.Name
-                    </label>                    
-                </li>
-            }
-        </ul>
+    <div class="col-3">        
+        @foreach (var ev in Model.Events)
+        {
+            <div class="row mb-1">
+                <label class="small mr-2">
+                    @Html.CheckBox("Visible", Model.Subscriptions[ev.Id].Visible, new { @class = "update-event-subscription", data_id = ev.Id, data_appId = Model.CurrentOrgUser.CurrentAppId })
+                    @ev.Name                    
+                    <img src="~/img/loading.gif" style="display:none" />                    
+                </label>
+                <div id="notifyOptions-@Model.Subscriptions[ev.Id].Id">
+                    <partial name="Shared/_NotifyOptions" model="Model.Subscriptions[ev.Id]"/>
+                </div>                
+            </div>
+        }      
+        
+        <a asp-page-handler="DisableNotifications" class="small" onclick="return confirm('This will disable all event notifications. Hand-off (activity) notifications are not affected.');">Turn off all notifications</a>
+        <br/>
+
+        <a class="btn btn-sm btn-info" asp-page="Feed" style="display:none" onclick="$(this).hide();" id="btnRefresh">Refresh</a>
     </div>
 
     <div class="col-9">
         @foreach (var dateGrp in Model.EventLogs.GroupBy(row => row.EventDate))
         {
             <h5>@Html.FormatValue(dateGrp.Key, "{0:ddd M/d}")</h5>
-            <ul>
-            @foreach (var ev in dateGrp)
+            @foreach (var numberGrp in dateGrp.GroupBy(row => row.Number))
             {
-                <li>
-                    <i class="@ev.IconClass" style="color:@ev.IconColor"></i>
-                    <span class="font-weight-bold">@ev.WorkItemNumber</span>
-                    <span>@ev.EventName</span>
-                    <span>@ev.CreatedBy</span>
-                    @ev.HtmlBody
-                </li>
+                <div class="ml-4">
+                    <div class="border-bottom mb-1">
+                        <partial name="Dashboard/Items/_ItemNumber" model="numberGrp.First()"/>
+                        <a asp-page="/WorkItem/View" asp-route-id="@numberGrp.First().Number">
+                            <partial name="Dashboard/Items/_Title" model="numberGrp.First()"/>
+                        </a>
+                    </div>                                
+                    <ul style="list-style:none">
+                        @foreach (var ev in numberGrp)
+                        {
+                            <li>
+                                <i class="@ev.IconClass" style="color:@ev.IconColor"></i>                    
+                                <span>@(ev.DisplayName):</span>
+                                @Html.Raw(@ev.HtmlBody)
+                            </li>
+                        }
+                    </ul>
+                </div>                
             }
-            </ul>
         }
     </div>
 </div>
+
+@section Scripts {
+    <script src="~/js/Feed.js"></script>
+    <script src="~/js/Notification.js"></script>
+}

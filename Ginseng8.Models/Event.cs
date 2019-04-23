@@ -3,7 +3,6 @@ using Postulate.Base.Attributes;
 using Postulate.Base.Extensions;
 using Postulate.SqlServer;
 using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
 
 namespace Ginseng.Models
@@ -21,13 +20,14 @@ namespace Ginseng.Models
 		CommentAdded = 5,
 		ImpedimentAdded = 6,
 		PriorityChanged = 7,
-		HandOff = 8,
+		HandOffForward = 8,
 		WorkItemFieldChanged = 9,
 		MilestoneDateChanged = 10,
 		EstimateChanged = 11,
 		ProjectAdded = 12,
 		WorkItemOpened = 13,
-		CodeCommitted = 14
+		CodeCommitted = 14,
+		HandOffBackward = 15
 	}
 
 	public class Event : AppTable
@@ -47,7 +47,6 @@ namespace Ginseng.Models
 				new Event() { Name = "Comment Added" },
 				new Event() { Name = "Impediment Added" },
 				new Event() { Name = "Priority Changed" },
-				new Event() { Name = "Hand Off" },
 				new Event() { Name = "Work Item Field Changed" },
 				new Event() { Name = "Milestone Date Changed" },
 				new Event() { Name = "Estimate Changed" },

@@ -6,10 +6,11 @@ using Postulate.SqlServer.IntKey;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
 using System.Linq;
+using System.Threading.Tasks;
 
 namespace Ginseng.Models
 {
-	public class Organization : BaseTable
+	public class Organization : BaseTable, IFindRelated<int>
 	{
 		[PrimaryKey]
 		[MaxLength(50)]
@@ -22,21 +23,50 @@ namespace Ginseng.Models
 		[DefaultExpression("1000")]
 		public int NextWorkItemNumber { get; set; } = 1000;
 
+		[DefaultExpression("3")]
+		public int IterationWeeks { get; set; } = 3;
+
+		[DefaultExpression("6")]
+		public int MilestoneWorkDayValue { get; set; } = 6; // Friday	
+
+		/// <summary>
+		/// Default developer activity for users who haven't set it
+		/// </summary>
+		[References(typeof(Activity))]
+		public int? DeveloperActivityId { get; set; }
+
+		/// <summary>
+		/// Used with Microsoft OAuth at least, maybe others
+		/// </summary>
+		[MaxLength(50)]
+		[Required]		
+		[UniqueKey]
+		public string TenantName { get; set; }
+
+		public WorkDay MilestoneWorkDay { get; set; }
+		public UserProfile OwnerUser { get; set; }
+
 		public override bool Validate(IDbConnection connection, out string message)
 		{
-			if (Name.Contains("--"))
+			if (Name.Contains("--") || Name.Contains(".."))
 			{
-				message = "Name may not contain consecutive dashes.";
+				message = "Name may not contain consecutive dashes or periods.";
 				return false;
 			}
 
-			var allowedChars = "abcdefghijklmnopqrstuvwxyz1234567890-".ToCharArray();
+			var allowedChars = "abcdefghijklmnopqrstuvwxyz1234567890-.".ToCharArray();
 			var nameChars = Name.Select(c => char.ToLower(c)).ToArray();
 			var invalid = nameChars.Except(allowedChars);
 
 			if (invalid.Any())
 			{
 				message = "Organization name may contain letters, numbers, and dashes only.";
+				return false;
+			}
+
+			if (IterationWeeks < 0)
+			{
+				message = "Iteration Weeks cannot be less than one.";
 				return false;
 			}
 
@@ -68,6 +98,18 @@ namespace Ginseng.Models
 					connection.Update(profile, null, r => r.OrganizationId);
 				}
 			}
+		}
+
+		public void FindRelated(IDbConnection connection, CommandProvider<int> commandProvider)
+		{
+			MilestoneWorkDay = commandProvider.FindWhere<WorkDay>(connection, new { Value = MilestoneWorkDayValue });
+			OwnerUser = commandProvider.Find<UserProfile>(connection, OwnerUserId);
+		}
+
+		public async Task FindRelatedAsync(IDbConnection connection, CommandProvider<int> commandProvider)
+		{
+			MilestoneWorkDay = await commandProvider.FindAsync<WorkDay>(connection, MilestoneWorkDayValue);
+			OwnerUser = await commandProvider.FindAsync<UserProfile>(connection, OwnerUserId);
 		}
 	}
 }

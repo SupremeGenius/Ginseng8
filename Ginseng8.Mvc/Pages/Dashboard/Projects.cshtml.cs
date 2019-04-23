@@ -58,10 +58,10 @@ namespace Ginseng.Mvc.Pages.Dashboard
 		public ILookup<int, Label> Labels { get; set; }
 
 		public Project SelectedProject { get; set; }
-
-		// used when single project is displayed
-		public ProjectInfoResult SelectedProjectInfo { get; set; }
 		public IEnumerable<Comment> ProjectComments { get; set; }
+
+		// used when single project is displayed, contains all the calculations/metadata not present in the base record
+		public ProjectInfoResult SelectedProjectInfo { get; set; }
 
 		public int CrosstabRowHeadingGridCols()
 		{
@@ -95,7 +95,7 @@ namespace Ginseng.Mvc.Pages.Dashboard
 			// we show details on only one project at a time
 			if (Id.HasValue)
 			{
-				return new OpenWorkItems()
+				return new OpenWorkItems(QueryTraces)
 				{
 					OrgId = OrgId,
 					ProjectId = Id,
@@ -116,7 +116,7 @@ namespace Ginseng.Mvc.Pages.Dashboard
 			{
 				SelectedProject = await Data.FindAsync<Project>(Id.Value);
 				SelectedProjectInfo = await new ProjectInfo() { Id = Id, OrgId = OrgId }.ExecuteSingleAsync(connection);
-				ProjectComments = await new Comments() { OrgId = OrgId, ObjectType = ObjectType.Project, ObjectIds = new int[] { Id.Value } }.ExecuteAsync(connection);
+				ProjectComments = await new Comments() { OrgId = OrgId, ObjectType = ObjectType.Project, ObjectIds = new[] { SelectedProject.Id } }.ExecuteAsync(connection);
 			}
 			else
 			{

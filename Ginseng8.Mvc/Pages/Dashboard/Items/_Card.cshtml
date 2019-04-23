@@ -8,73 +8,17 @@
             <div class="col">
                 <partial name="Dashboard/Items/_ItemNumber" model="Model.WorkItem"/>
                 <partial name="Dashboard/Items/_Title" model="Model.WorkItem" />                
-
-                <div style="display:inline-block">
-                    <button class="btn btn-light dropdown-toggle btn-sm" type="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                        <i class="fal fa-tags" title="Labels"></i>
-                    </button>
-                    <div class="dropdown-menu">
-                        @foreach (var item in Model.Dropdowns.LabelItems(Model.SelectedLabels))
-                        {
-                            <form method="post">
-                                <input type="hidden" name="WorkItemNumber" value="@Model.WorkItem.Number"/>
-                                <input type="hidden" name="LabelId" value="@item.Id"/>
-                                <a class="dropdown-item labelCheckboxLink">
-                                    @Html.CheckBox("selected", item.Selected, new { @class = "labelCheckbox" })
-                                    <span class="badge" style="background-color:@item.BackColor;color:@item.ForeColor">@item.Name</span>
-                                </a>
-                            </form>                            
-                        }
-                    </div>
-                </div>
-
-                <div id="labels-@Model.WorkItem.Number" style="display:inline-block">
-                    <partial name="Dashboard/Items/_Labels" model="Model.SelectedLabels"/>
-                </div>
+                <partial name="Dashboard/Items/_LabelControls" model="Model"/>
+                <partial name="Dashboard/Items/_Modifiers" model="Model.WorkItem"/>
             </div>
             <div class="col-12 col-md-auto d-flex align-items-center">                
-                @if (!Model.WorkItem.AssignedUserId.HasValue || Model.UserId == Model.WorkItem.AssignedUserId)
-                {
-                    <div class="dropdown">
-                        <button class="btn btn-secondary btn-light dropdown-toggle btn-sm" type="button" id="handoff-@Model.WorkItem.Number" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-                            @Model.HandOffButtonText()
-                            <partial name="Items/_Priority" model="Model.WorkItem"/>
-                        </button>
-                        <div class="dropdown-menu" aria-labelledby="dropdownMenuButton">
-                        @foreach (var act in Model.GetActivityOptions())
-                        {
-                            <partial name="Dashboard/Items/_Activities" model="act"/>
-                        }
-                        @if (Model.WorkItem.IsPaused())
-                        {
-                            <a href="#" class="dropdown-item no-propagation resume-work-item" data-number="@Model.WorkItem.Number">I'll take this</a>
-                        }
-                        @if (Model.WorkItem.AssignedUserId.HasValue)
-                        {
-                            <div class="dropdown-divider"></div>
-                            <a href="#" class="dropdown-item no-propagation unassign-work-item" data-number="@Model.WorkItem.Number">Remove Me</a>
-                        }
-                        </div>
-                    </div>
-                }
-                else
-                {
-                    <span>
-                        @Model.WorkItem.ActivityStatus()
-                        <partial name="Items/_Priority" model="Model.WorkItem"/>
-                    </span>
-                }
-
-                @if (Model.WorkItem.HasImpediment)
-                {                    
-                    <i class="@Comment.ImpedimentIcon ml-2" style="color:darkred" title="This item has an impediment, please see the comments"></i>
-                }                
+                <partial name="Dashboard/Items/_Status" model="Model"/>
             </div>
         </div>
     </div>
-    <div class="collapse" id="item-@Model.WorkItem.Id" data-parent="#accordion">
+    <div class="collapse" id="item-@Model.WorkItem.Id" data-parent="#@(Model.AccordionElement)">
         <div class="card card-body">
-            <partial name="Items/_ItemInner" model="Model"/>
+            <partial name="Dashboard/Items/_ItemInner" model="Model"/>
         </div>
     </div>
 </div>

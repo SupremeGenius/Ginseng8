@@ -7,10 +7,13 @@ using Postulate.Base;
 using Postulate.Base.Attributes;
 using Postulate.Base.Interfaces;
 using Postulate.Base.Models;
+using Postulate.SqlServer.IntKey;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.Data;
+using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace Ginseng.Models
@@ -21,7 +24,8 @@ namespace Ginseng.Models
 	[TrackChanges(IgnoreProperties = "ModifiedBy;DateModified")]
 	public class WorkItem : BaseTable, IBody, ITrackedRecord
 	{
-		public const string IconClass = "far fa-plus-hexagon";
+		public const string IconCreated = "far fa-plus-hexagon";
+		public const string IconClosed = "far fa-clipboard-check";
 
 		[References(typeof(Organization))]
 		[PrimaryKey]
@@ -41,6 +45,9 @@ namespace Ginseng.Models
 
 		[References(typeof(UserProfile))]
 		public int? DeveloperUserId { get; set; }
+
+		[References(typeof(HandOff))]
+		public int? LastHandOffId { get; set; }
 
 		public string TextBody { get; set; }
 
@@ -80,15 +87,11 @@ namespace Ginseng.Models
 
 		public override async Task AfterSaveAsync(IDbConnection connection, SaveAction action, IUser user)
 		{
-			// todo: label parsing from title
-			/*
 			if (action == SaveAction.Insert)
 			{
-				int[] labelIds = await ParseLabelsAsync(connection, Title);
-			}*/
+				await ParseLabelsAsync(connection);
+				await ParseProjectAsync(connection);
 
-			if (action == SaveAction.Insert)
-			{
 				await EventLog.WriteAsync(connection, new EventLog()
 				{
 					WorkItemId = Id,
@@ -97,14 +100,51 @@ namespace Ginseng.Models
 					EventId = SystemEvent.WorkItemCreated,
 					HtmlBody = Title,
 					TextBody = Title,
-					IconClass = IconClass
+					IconClass = IconCreated
 				}, user);
 			}
 		}
 
-		private Task<int[]> ParseLabelsAsync(IDbConnection connection, string title)
+		private async Task ParseProjectAsync(IDbConnection connection)
 		{
-			throw new NotImplementedException();
+			var projectMatch = Regex.Match(Title, @"\[.*\]");
+			if (projectMatch.Success)
+			{
+				string projectToken = projectMatch.Value.Substring(1);
+				projectToken = projectToken.Substring(0, projectToken.Length - 1);
+
+				var projectId = await connection.QuerySingleOrDefaultAsync<int>(
+					@"SELECT TOP (1) [Id] FROM [dbo].[Project] 
+					WHERE [ApplicationId]=@appId AND 
+					[Name] LIKE '%' + @projectName + '%'", new { appId = ApplicationId, projectName = projectToken });
+
+				if (projectId != 0)
+				{
+					ProjectId = projectId;
+					await connection.UpdateAsync(this, null, r => r.ProjectId);
+				}
+			}					
+		}
+
+		private async Task ParseLabelsAsync(IDbConnection connection)
+		{
+			var labelMatches = Regex.Matches(Title, @"#\w*");
+			var labelNames = labelMatches.Cast<Match>().Select(m => m.Value.Substring(1)).ToArray();
+			
+			if (labelNames.Any())
+			{
+				await connection.ExecuteAsync(
+					@"INSERT INTO [dbo].[WorkItemLabel] (
+						[WorkItemId], [LabelId], [CreatedBy], [DateCreated]
+					) SELECT
+						@workItemId, [Id], @userName, @dateCreated
+					FROM
+						[dbo].[Label]
+					WHERE
+						[Name] IN @labelNames AND
+						[OrganizationId]=@orgId", 
+					new { workItemId = Id, orgId = OrganizationId, labelNames, userName = CreatedBy, dateCreated = DateCreated });
+			}
 		}
 
 		public async Task SetNumberAsync(IDbConnection connection)
@@ -131,14 +171,19 @@ namespace Ginseng.Models
 		{
 			if (changes.Include(nameof(CloseReasonId)))
 			{
-				string text = (CloseReasonId.HasValue) ? $"Work item {Number} was closed" : $"Work item {Number} was re-opened";
+				string closeReason = string.Empty;
+				if (CloseReasonId.HasValue)
+				{
+					closeReason = await connection.QuerySingleAsync<string>("SELECT [Name] FROM [app].[CloseReason] WHERE [Id]=@id", new { id = CloseReasonId });
+				}
+				string text = (CloseReasonId.HasValue) ? $"Work item {Number} was closed {closeReason}" : $"Work item {Number} was re-opened";
 				await EventLog.WriteAsync(connection, new EventLog()
 				{
 					WorkItemId = Id,
 					OrganizationId = OrganizationId,
 					ApplicationId = ApplicationId,
 					EventId = (CloseReasonId.HasValue) ? SystemEvent.WorkItemClosed : SystemEvent.WorkItemOpened,
-					IconClass = (CloseReasonId.HasValue) ? "fas fa-clipboard-check" : "fas fa-play",
+					IconClass = (CloseReasonId.HasValue) ? IconClosed : "fas fa-play",
 					IconColor = (CloseReasonId.HasValue) ? "green" : "orange",
 					HtmlBody = text,
 					TextBody = text
@@ -154,14 +199,32 @@ namespace Ginseng.Models
 					ApplicationId = ApplicationId,
 					EventId = SystemEvent.MilestoneChanged,
 					IconClass = "fas fa-flag-checkered",
-					HtmlBody = $"Milestone changed from {milestoneChange.OldValue} to {milestoneChange.NewValue}",
-					TextBody = $"Milestone changed from {milestoneChange.OldValue} to {milestoneChange.NewValue}"
+					HtmlBody = $"Milestone changed from {milestoneChange.OldValue ?? "<i>null</i>"} to {milestoneChange.NewValue ?? "<i>null</i>"}",
+					TextBody = $"Milestone changed from {milestoneChange.OldValue ?? "<null>"} to {milestoneChange.NewValue ?? "<null>"}"
 				}, user);
 			}
 
 			if (changes.Include(nameof(ProjectId)))
 			{
 				// todo: log project change event
+			}
+
+			IEnumerable<PropertyChange> modifiedColumns;
+			if (changes.Include(new string[] { nameof(Title) }, out modifiedColumns))
+			{
+				foreach (var col in modifiedColumns)
+				{
+					await EventLog.WriteAsync(connection, new EventLog()
+					{
+						WorkItemId = Id,
+						OrganizationId = OrganizationId,
+						ApplicationId = ApplicationId,
+						EventId = SystemEvent.WorkItemFieldChanged,
+						IconClass = "far fa-pencil",
+						HtmlBody = $"{col.PropertyName} changed from <em>{col.OldValue}</em> to <em>{col.NewValue}</em>",
+						TextBody = $"{col.PropertyName} changed from {col.OldValue} to {col.NewValue}"
+					}, user);
+				}
 			}
 		}
 

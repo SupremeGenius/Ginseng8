@@ -8,25 +8,24 @@ using System.Data;
 using System.Data.SqlClient;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Security.Claims;
 using System.Security.Principal;
 using System.Threading.Tasks;
 
-namespace Ginseng.Mvc
+namespace Ginseng.Mvc.Services
 {
 	/// <summary>
 	/// Low-level CRUD handler that supports Pages and ViewComponents
 	/// </summary>
 	public class DataAccess
 	{
-		private readonly IConfiguration _config;				
+		private readonly IConfiguration _config;
 
 		public UserProfile CurrentUser { get; private set; }
 		public Organization CurrentOrg { get; private set; }
 		public OrganizationUser CurrentOrgUser { get; private set; }
 
 		public DataAccess(IConfiguration config)
-		{			
+		{
 			_config = config;
 		}
 
@@ -57,7 +56,7 @@ namespace Ginseng.Mvc
 			using (var cn = GetConnection())
 			{
 				Initialize(cn, user, tempData);
-			}			
+			}
 		}
 
 		public async Task<T> FindWhereAsync<T>(SqlConnection connection, object criteria)
@@ -146,7 +145,7 @@ namespace Ginseng.Mvc
 			{
 				using (var cn = GetConnection())
 				{
-					await cn.UpdateAsync(record, CurrentUser, setColumns);					
+					await cn.UpdateAsync(record, CurrentUser, setColumns);
 					return true;
 				}
 			}
@@ -200,17 +199,28 @@ namespace Ginseng.Mvc
 			return (record, properties.ToArray());
 		}
 
-		private void SetSuccessMessage(string message)
+		public void SetSuccessMessage(string message)
 		{
 			TempData.Remove(AlertCss.Success);
 			if (string.IsNullOrEmpty(message)) return;
 			TempData.Add(AlertCss.Success, message);
 		}
 
-		private void SetErrorMessage(Exception exception)
+		public void SetErrorMessage(string message)
+		{
+			TempData.Remove(AlertCss.Error);
+			TempData.Add(AlertCss.Error, message);
+		}
+
+		public void SetErrorMessage(Exception exception)
 		{
 			TempData.Remove(AlertCss.Error);
 			TempData.Add(AlertCss.Error, exception.Message);
+		}
+
+		public void ClearErrorMessage()
+		{
+			TempData.Remove(AlertCss.Error);
 		}
 	}
 }

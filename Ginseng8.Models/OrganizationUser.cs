@@ -1,4 +1,5 @@
-﻿using Ginseng.Models.Conventions;
+﻿using Dapper;
+using Ginseng.Models.Conventions;
 using Postulate.Base;
 using Postulate.Base.Attributes;
 using Postulate.Base.Interfaces;
@@ -7,6 +8,9 @@ using System;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data;
+using System.Data.SqlClient;
+using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace Ginseng.Models
@@ -55,6 +59,9 @@ namespace Ginseng.Models
 		[References(typeof(Activity))]
 		public int? DefaultActivityId { get; set; }
 
+		[Column(TypeName = "money")]
+		public decimal? InvoiceRate { get; set; }
+
 		/// <summary>
 		/// This is a join request (or invite)
 		/// </summary>
@@ -66,13 +73,18 @@ namespace Ginseng.Models
 		public bool IsEnabled { get; set; }
 
 		public Application CurrentApp { get; set; }
+
 		public UserProfile UserProfile { get; set; }
+		public Organization Organization { get; set; }
 
 		[NotMapped]
 		public string OrgName { get; set; }
 
 		[NotMapped]
 		public string UserName { get; set; }
+
+		[NotMapped]
+		public string Email { get; set; }
 
 		public void FindRelated(IDbConnection connection, CommandProvider<int> commandProvider)
 		{
@@ -82,6 +94,7 @@ namespace Ginseng.Models
 			}
 
 			UserProfile = commandProvider.Find<UserProfile>(connection, UserId);
+			Organization = commandProvider.Find<Organization>(connection, OrganizationId);
 		}
 
 		public async Task FindRelatedAsync(IDbConnection connection, CommandProvider<int> commandProvider)
@@ -92,6 +105,7 @@ namespace Ginseng.Models
 			}
 
 			UserProfile = await commandProvider.FindAsync<UserProfile>(connection, UserId);
+			Organization = await commandProvider.FindAsync<Organization>(connection, OrganizationId);
 		}
 
 		internal static async Task<string> GetUserDisplayNameAsync(IDbConnection connection, int orgId, int userId, IUser user)

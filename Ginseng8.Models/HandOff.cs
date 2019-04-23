@@ -1,12 +1,11 @@
-﻿using System.ComponentModel.DataAnnotations.Schema;
-using System.Data;
-using System.Threading.Tasks;
-using Ginseng.Models.Conventions;
+﻿using Ginseng.Models.Conventions;
 using Ginseng.Models.Interfaces;
 using Postulate.Base;
 using Postulate.Base.Attributes;
 using Postulate.Base.Interfaces;
 using Postulate.SqlServer.IntKey;
+using System.Data;
+using System.Threading.Tasks;
 
 namespace Ginseng.Models
 {
@@ -57,27 +56,27 @@ namespace Ginseng.Models
 			{
 				var workItem = await connection.FindAsync<WorkItem>(WorkItemId);
 				workItem.ActivityId = ToActivityId;
-
-				// clear the user id from the column implied by the activity responsibility
-				// in order to make room for someone to take the work item
-				var activity = await connection.FindAsync<Activity>(ToActivityId);
-				Responsibility.ClearWorkItemUserActions[activity.ResponsibilityId].Invoke(workItem);
-
+				workItem.LastHandOffId = Id;										
 				await connection.SaveAsync(workItem, user);
 
+				var toActivity = await connection.FindAsync<Activity>(ToActivityId);
 				var fromActivity = await connection.FindAsync<Activity>(FromActivityId);
-				string displayUser = await OrganizationUser.GetUserDisplayNameAsync(connection, workItem.OrganizationId, FromUserId, user);				
-				string text = $"{displayUser} handed off work item {workItem.Number} from {fromActivity.Name} to {activity.Name}";
+				string displayUser = await OrganizationUser.GetUserDisplayNameAsync(connection, workItem.OrganizationId, FromUserId, user);
+				string text = $"{displayUser} handed off work item {workItem.Number} from {fromActivity.Name} to {toActivity.Name}";
 
-				await EventLog.WriteAsync(connection, new EventLog(WorkItemId, user)
+				int eventLogId = await EventLog.WriteAsync(connection, new EventLog(WorkItemId, user)
 				{
-					EventId = SystemEvent.HandOff,
+					EventId = (IsForward) ? SystemEvent.HandOffForward : SystemEvent.HandOffBackward,
 					IconClass = GetIconClass(IsForward),
 					IconColor = GetColor(IsForward),
 					HtmlBody = text,
-					TextBody = text
+					TextBody = text,
+					SourceId = Id,
+					SourceTable = "HandOff"
 				});
-			}			
+				
+				await Notification.CreateFromActivitySubscriptions(connection, eventLogId);				
+			}
 		}
 	}
 }

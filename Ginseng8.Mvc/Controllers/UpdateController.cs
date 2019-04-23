@@ -6,6 +6,7 @@ using Ginseng.Mvc.Extensions;
 using Ginseng.Mvc.Helpers;
 using Ginseng.Mvc.Models;
 using Ginseng.Mvc.Queries;
+using Ginseng.Mvc.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Filters;
@@ -13,6 +14,7 @@ using Microsoft.Extensions.Configuration;
 using Newtonsoft.Json;
 using Postulate.SqlServer.IntKey;
 using System;
+using System.Collections.Generic;
 using System.Data;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -88,6 +90,29 @@ namespace Ginseng.Mvc.Controllers
 			return await UpdateInnerAsync(workItem, htmlBody);
 		}
 
+		public async Task<JsonResult> AppMilestoneBody(int appId, int milestoneId, string htmlBody)
+		{
+			try
+			{
+				using (var cn = _data.GetConnection())
+				{
+					var appMs =
+						await cn.FindWhereAsync<AppMilestone>(new { ApplicationId = appId, MilestoneId = milestoneId }) ??
+						new AppMilestone() { ApplicationId = appId, MilestoneId = milestoneId };
+
+					appMs.HtmlBody = htmlBody;
+					await appMs.SaveHtmlAsync(_data, cn);
+
+					await cn.SaveAsync(appMs, _data.CurrentUser);
+				}
+				return Json(new { success = true });
+			}
+			catch (Exception exc)
+			{
+				return Json(new { success = false, message = exc.Message });
+			}				
+		}
+
 		public async Task<JsonResult> ModelClassBody(int id, string htmlBody)
 		{
 			var mc = await _data.FindAsync<ModelClass>(id);
@@ -106,9 +131,10 @@ namespace Ginseng.Mvc.Controllers
 			try
 			{
 				record.HtmlBody = htmlBody;
-				record.SaveHtml();
 				record.ModifiedBy = User.Identity.Name;
-				record.DateModified = _data.CurrentUser.LocalTime;
+				record.DateModified = _data.CurrentUser.LocalTime;				
+				await record.SaveHtmlAsync(_data);				
+
 				await _data.TryUpdateAsync(record, r => r.HtmlBody, r => r.TextBody, r => r.ModifiedBy, r => r.DateModified);
 				return Json(new { success = true });
 			}
@@ -146,12 +172,25 @@ namespace Ginseng.Mvc.Controllers
 		}
 
 		[Route("/Update/CurrentApp/{id}")]
-		public async Task<ActionResult> CurrentApp(int id, string returnUrl)
+		public async Task<RedirectResult> CurrentApp(int id, string returnUrl)
 		{
 			if (_data.CurrentOrgUser == null) return Redirect(returnUrl);
 
 			_data.CurrentOrgUser.CurrentAppId = (id != 0) ? id : default(int?);
 			await _data.TryUpdateAsync(_data.CurrentOrgUser, r => r.CurrentAppId);
+			return Redirect(returnUrl);
+		}
+
+		[Route("/Update/CurrentOrg/{id}")]
+		public async Task<RedirectResult> CurrentOrg(int id, string returnUrl)
+		{
+			using (var cn = _data.GetConnection())
+			{
+				//var myOrgs = await new MyOrgs() { UserId = _data.CurrentUser.UserId }.ExecuteAsync(cn);
+			}
+				
+			_data.CurrentUser.OrganizationId = id;
+			await _data.TryUpdateAsync(_data.CurrentUser, r => r.OrganizationId);
 			return Redirect(returnUrl);
 		}
 
@@ -161,6 +200,25 @@ namespace Ginseng.Mvc.Controllers
 			var mc = await _data.FindAsync<ModelClass>(id);
 			mc.Name = newName;
 			await _data.TryUpdateAsync(mc, r => r.Name);
+			return Content(newName);
+		}
+
+		public async Task<ContentResult> WorkItemTitle(string elementId, string newTitle)
+		{
+			int number = IntFromText(elementId);
+			var workItem = await _data.FindWhereAsync<WorkItem>(new { OrganizationId = _data.CurrentOrg.Id, Number = number });
+			workItem.Title = newTitle;
+			await _data.TryUpdateAsync(workItem, r => r.Title);
+			return Content(newTitle);
+		}
+
+		public async Task<ContentResult> ProjectName(string elementId, string newName)
+		{
+			int projectId = IntFromText(elementId);
+			var project = await _data.FindAsync<Project>(projectId);
+			if (project.Application.OrganizationId != _data.CurrentOrg.Id) throw new Exception("Application is in a different organization.");
+			project.Name = newName;
+			await _data.TryUpdateAsync(project, r => r.Name);
 			return Content(newName);
 		}
 
@@ -194,6 +252,85 @@ namespace Ginseng.Mvc.Controllers
 						localTime = _data.CurrentUser.LocalTime,
 						orgId = _data.CurrentOrg.Id,
 						propertyOrder = data.AsTableValuedParameter("dbo.WorkItemPriority", "Number", "Index")
+					}, commandType: CommandType.StoredProcedure);
+				}
+
+				return Json(new { success = true });
+			}
+			catch (Exception exc)
+			{
+				return Json(new { success = false, message = exc.Message });
+			}
+		}
+
+		public async Task<JsonResult> EventSubscription(int appId, int eventId, bool selected)
+		{
+			try
+			{
+				var ev = await _data.FindWhereAsync<EventSubscription>(new
+				{
+					EventId = eventId,
+					OrganizationId = _data.CurrentOrg.Id,
+					ApplicationId = appId,
+					_data.CurrentUser.UserId
+				}) ?? new EventSubscription()
+				{
+					EventId = eventId,
+					OrganizationId = _data.CurrentOrg.Id,
+					ApplicationId = appId,
+					UserId = _data.CurrentUser.UserId
+				};
+
+				ev.Visible = selected;
+				await _data.TrySaveAsync(ev);
+
+				return Json(new { success = true });
+			}
+			catch (Exception exc)
+			{
+				return Json(new { success = false, message = exc.Message });
+			}
+		}
+
+		public async Task<PartialViewResult> ToggleNotification(int id, string propertyName, string tableName)
+		{
+			var getNotification = new Dictionary<string, Func<IDbConnection, Task<INotifyOptions>>>()
+			{
+				{ nameof(Ginseng.Models.EventSubscription), async (cn) => await cn.FindAsync<EventSubscription>(id) },
+				{ nameof(ActivitySubscription), async (cn) => await cn.FindAsync<ActivitySubscription>(id) }
+			};
+
+			using (var cn = _data.GetConnection())
+			{
+				var notification = await getNotification[tableName].Invoke(cn);
+				var property = notification.GetType().GetProperty(propertyName);
+				bool value = !(bool)property.GetValue(notification);
+				
+				// it's too bad this doesn't do BaseTable.BeforeUpdate (so user/date stamp not updated), but maybe some day
+				await cn.ExecuteAsync($"UPDATE [dbo].[{notification.TableName}] SET [{propertyName}]=@value WHERE [Id]=@id", new { value, id });
+
+				property.SetValue(notification, value);
+
+				return PartialView("/Pages/Shared/_NotifyOptions.cshtml", notification);
+			}					
+		}
+
+		[HttpPost]
+		public async Task<JsonResult> ProjectPriorities()
+		{
+			try
+			{
+				string body = await Request.ReadStringAsync();
+				var data = JsonConvert.DeserializeObject<ProjectPriorityUpdate>(body);
+
+				using (var cn = _data.GetConnection())
+				{
+					await cn.ExecuteAsync("dbo.UpdateProjectPriorities", new
+					{
+						userName = User.Identity.Name,
+						localTime = _data.CurrentUser.LocalTime,
+						orgId = _data.CurrentOrg.Id,
+						priorities = data.Items.AsTableValuedParameter("dbo.WorkItemPriority", "Number", "Index")
 					}, commandType: CommandType.StoredProcedure);
 				}
 

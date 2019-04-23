@@ -4,6 +4,32 @@
     ViewData["Title"] = "My Items";
 }
 
+<a asp-page="/Setup/AppActivities" class="btn btn-light btn-sm mb-3 mr-3">My Activities: @Model.MyHandOffActivityList()</a>
+
+@if (Model.MyHandOffItems.Any())
+{
+    <button class="btn btn-sm btn-light mb-3" data-toggle="collapse" data-target="#handOffItems" aria-expanded="false" aria-controls="handOffItems">@Model.MyHandOffItems.Count() Paused Items</button>
+    <div class="collapse" id="handOffItems">
+        @foreach (var appGrp in Model.MyHandOffItems.GroupBy(row => row.ApplicationId))
+        {
+            <h4>@appGrp.First().ApplicationName</h4>
+            @foreach (var milestoneGrp in appGrp.OrderBy(row => row.SortMilestoneDate).GroupBy(row => row.MilestoneId))
+            {
+                var milestoneItem = milestoneGrp.First();
+                <partial name="Items/_MilestoneHeader" model="milestoneItem" />
+                <div id="handOff-app-@appGrp.Key-@milestoneGrp.Key" class="milestone-items" data-milestone-id="@milestoneGrp.Key">
+                    <div class="ml-3" data-user-id="@Model.UserId">
+                        @foreach (var item in milestoneGrp)
+                        {
+                            <partial name="Items/_Card" model="@(new WorkItemCardView() { WorkItem = item, Dropdowns = Model.Dropdowns, SelectedLabels = Model.HandOffLabels[item.Id], UserId = Model.UserId, Comments = Model.HandOffComments[item.Id], AccordionElement = "handOffItems" })" />
+                        }
+                    </div>
+                </div>
+            }
+        }
+    </div>
+}
+
 <div id="accordion">
 @foreach (var appGrp in Model.WorkItems.GroupBy(row => row.ApplicationId))
 {
@@ -19,20 +45,27 @@
             <partial name="Items/_Load" model="Model.GetLoadView(milestoneGrp, (wd) => wd.UserId == Model.UserId)"/>
         </div>
 
-        <div id="app-@appGrp.Key-@milestoneGrp.Key" class="milestone-items" data-milestone-id="@milestoneGrp.Key">
-            
+        <div id="app-@appGrp.Key-@milestoneGrp.Key" class="milestone-items" data-milestone-id="@milestoneGrp.Key">            
             <div class="ml-3 sortable" data-user-id="@Model.UserId">
                 @foreach (var item in milestoneGrp)
                 {
                     <partial name="Items/_Card" model="new WorkItemCardView() { WorkItem = item, Dropdowns = Model.Dropdowns, SelectedLabels = Model.SelectedLabels[item.Id], UserId = Model.UserId, Comments = Model.Comments[item.Id] }" />
                 }
-                @await Html.PartialAsync("Items/_InsertItem", new InsertItemView(new Dictionary<string, int>()
+
+                @if (Model.CurrentOrgUser.DefaultActivityId.HasValue)
                 {
-                    { "applicationId", appGrp.Key },
-                    { "milestoneId", milestoneGrp.Key },
-                    { Model.UserIdColumnName, Model.UserId },
-                    { "activityId", Model.CurrentOrgUser.DefaultActivityId ?? 0 }
-                }))
+                    @await Html.PartialAsync("Items/_InsertItem", new InsertItemView(new Dictionary<string, int>()
+                    {
+                        { "applicationId", appGrp.Key },
+                        { "milestoneId", milestoneGrp.Key },
+                        { Model.UserIdColumnName, Model.UserId },
+                        { "activityId", Model.CurrentOrgUser.DefaultActivityId.Value }
+                    }))
+                }
+                else
+                {
+                    <p>To add work items here, please set your Default Activity on the <a asp-page="/Setup/OrgUser">Org User</a> page.</p>
+                }
             </div>                        
         </div>
     }
@@ -41,10 +74,17 @@
 
 @if (!Model.WorkItems.Any() && Html.CurrentAppId() != 0)
 {
-    @await Html.PartialAsync("Items/_InsertItem", new InsertItemView(new Dictionary<string, int>()
+    @if (Model.CurrentOrgUser.DefaultActivityId.HasValue)
     {
-        { "applicationId", Html.CurrentAppId() },        
-        { Model.UserIdColumnName, Model.UserId },
-        { "activityId", Model.CurrentOrgUser.DefaultActivityId ?? 0 }
-    }))
+        @await Html.PartialAsync("Items/_InsertItem", new InsertItemView(new Dictionary<string, int>()
+        {
+            { "applicationId", Html.CurrentAppId() },        
+            { Model.UserIdColumnName, Model.UserId },
+            { "activityId", Model.CurrentOrgUser.DefaultActivityId ?? 0 }
+        }))
+    }
+    else
+    {
+        <p>To add work items here, please set your Default Activity on the <a asp-page="/Setup/OrgUser">Org User</a> page.</p>
+    }
 }

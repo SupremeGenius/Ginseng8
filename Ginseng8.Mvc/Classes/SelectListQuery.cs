@@ -7,6 +7,9 @@ using System.Threading.Tasks;
 
 namespace Ginseng.Mvc.Classes
 {
+	/// <summary>
+	/// Defines a query that fills a SelectList. Queries must return two columns named Value and Text
+	/// </summary>
 	public class SelectListQuery : Query<SelectListItem>
 	{
 		public SelectListQuery(string sql) : base(sql)
@@ -16,6 +19,12 @@ namespace Ginseng.Mvc.Classes
 		public List<SelectListItem> ExecuteItems(IDbConnection connection)
 		{
 			return Execute(connection).ToList();
+		}
+
+		public async Task<List<SelectListItem>> ExecuteItemsAsync(IDbConnection connection)
+		{
+			var results = await ExecuteAsync(connection);
+			return results.ToList();
 		}
 
 		public SelectList ExecuteSelectList(IDbConnection connection, object selectedValue = null)

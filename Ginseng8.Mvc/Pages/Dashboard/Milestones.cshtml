@@ -14,7 +14,7 @@
         {
             var milestoneItem = milestoneGrp.First();
             <li class="nav-item">
-                <a href="#app-@appGrp.Key-ms@(milestoneGrp.Key)" data-toggle="tab" class="nav-link">
+                <a href="#app-@appGrp.Key-ms@(milestoneGrp.Key)" data-toggle="tab" class="nav-link" id="tab-@milestoneGrp.Key">
                     <partial name="Items/_MilestoneHeader" model="milestoneItem"/>
                 </a>
             </li>
@@ -23,9 +23,36 @@
     <div class="tab-content my-3" id="tabContent">
     @foreach (var milestoneGrp in appGrp.OrderBy(row => row.MilestoneDate).GroupBy(row => row.MilestoneId))
     {    
-        <div id="app-@appGrp.Key-ms@(milestoneGrp.Key)" class="tab-pane fade" data-milestone-id="@milestoneGrp.Key" role="tabpanel">
+        <div id="app-@appGrp.Key-ms@(milestoneGrp.Key)" class="tab-pane fade" data-milestone-id="@milestoneGrp.Key" data-tab-id="tab-@milestoneGrp.Key" role="tabpanel">
             <div class="ml-3">
                 <partial name="Items/_Load" model="Model.GetLoadView(milestoneGrp)"/>
+
+                @if (milestoneGrp.First().MilestoneDate < DateTime.Today)
+                {
+                    if (Model.NextSoonest != null)
+                    {
+                        <form method="post" asp-page-handler="MoveToNextMilestone">
+                            <input type="hidden" name="appId" value="@appGrp.Key"/>
+                            <input type="hidden" name="fromMilestoneId" value="@milestoneGrp.Key"/>
+                            <input type="hidden" name="toMilestoneId" value="@Model.NextSoonest.Id"/>
+                            <label>Move to next soonest milestone</label>
+                            <button class="btn btn-sm btn-dark" type="submit">@Html.FormatValue(Model.NextSoonest.Date, "{0:ddd M/d}")</button>
+                        </form>
+                    }                    
+
+                    if (Model.NextGenerated != null)
+                    {
+                        <form method="post" asp-page-handler="MoveToNewMilestone">
+                            <input type="hidden" name="appId" value="@appGrp.Key"/>
+                            <input type="hidden" name="fromMilestoneId" value="@milestoneGrp.Key"/>
+                            <input type="hidden" name="toName" value="@Model.NextGenerated.Name"/>
+                            <input type="hidden" name="toDate" value="@Model.NextGenerated.Date"/>
+                            <label>Move to new milestone</label>
+                            <button class="btn btn-sm btn-dark" type="submit">@Html.FormatValue(Model.NextGenerated.Date, "{0:ddd M/d}")</button>
+                            <label>based on your <a asp-page="/Setup/Organization">Org Setup</a></label>
+                        </form>
+                    }
+                }
 
                 @foreach (var item in milestoneGrp)
                 {
@@ -53,6 +80,7 @@
 @if (Model.CurrentOrgUser.CurrentAppId.HasValue)
 {
     <div id="emptyMilestones">
+        <span>Tip: Milestones with no work items show here. After they get at least one work item, they appear in tabs above.</span>
         @foreach (var ms in Model.EmptyMilestones)
         {            
             <partial name="Items/_MilestoneHeader" model="ms"/>
@@ -67,13 +95,7 @@
     </div>
 }
 
-<div class="col-6 offset-3 mt-4">
-    <form method="post" asp-page-handler="Create" class="form-inline">
-        <input type="text" name="Name" class="form-control form-control-sm mr-2" placeholder="milestone name" required="required"/>
-        <input type="text" name="Date" class="form-control form-control-sm mr-2 datepicker" placeholder="date" required="required" autocomplete="off"/>
-        <button type="submit" class="btn btn-dark btn-sm">Add Milestone</button>
-    </form>
-</div>
+<partial name="Dashboard/Items/_CreateMilestone"/>
 
 @section Scripts {
     <script>

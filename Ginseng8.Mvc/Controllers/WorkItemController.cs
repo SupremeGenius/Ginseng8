@@ -5,6 +5,7 @@ using Ginseng.Mvc.Helpers;
 using Ginseng.Mvc.Models;
 using Ginseng.Mvc.Queries;
 using Ginseng.Mvc.Queries.SelectLists;
+using Ginseng.Mvc.Services;
 using Ginseng.Mvc.ViewModels;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,7 @@ using System.Collections.Generic;
 using System.Data;
 using System.Data.SqlClient;
 using System.IO;
+using System.Linq;
 using System.Threading.Tasks;
 
 namespace Ginseng.Mvc.Controllers
@@ -46,10 +48,10 @@ namespace Ginseng.Mvc.Controllers
 
 			// make sure item is part of this org
 			workItem.OrganizationId = _data.CurrentOrg.Id;
-			workItem.SaveHtml();
-
+						
 			using (var cn = _data.GetConnection())
 			{
+				await workItem.SaveHtmlAsync(_data, cn);
 				await workItem.SetNumberAsync(cn);
 				if (await _data.TrySaveAsync(cn, workItem))
 				{
@@ -94,6 +96,24 @@ namespace Ginseng.Mvc.Controllers
 					var workItem = await _data.FindWhereAsync<WorkItem>(cn, new { OrganizationId = _data.CurrentOrg.Id, Number = id });
 					var activity = await _data.FindAsync<Activity>(cn, workItem.ActivityId.Value);					
 					Responsibility.SetWorkItemUserActions[activity.ResponsibilityId].Invoke(workItem, _data.CurrentUser.UserId);
+					await _data.TrySaveAsync(cn, workItem);
+					return Json(new { success = true });
+				}
+			}
+			catch (Exception exc)
+			{
+				return Json(new { success = false, message = exc.Message });
+			}
+		}
+
+		public async Task<JsonResult> CancelActivity([FromForm]int id)
+		{
+			try
+			{
+				using (var cn = _data.GetConnection())
+				{
+					var workItem = await _data.FindWhereAsync<WorkItem>(cn, new { OrganizationId = _data.CurrentOrg.Id, Number = id });
+					workItem.ActivityId = null;
 					await _data.TrySaveAsync(cn, workItem);
 					return Json(new { success = true });
 				}
@@ -226,10 +246,11 @@ namespace Ginseng.Mvc.Controllers
 			using (var cn = _data.GetConnection())
 			{
 				comment.OrganizationId = _data.CurrentOrg.Id;
-				comment.SaveHtml();
+				await comment.SaveHtmlAsync(_data, cn);
 				await _data.TrySaveAsync(comment);
 
-				var vm = new CommentView();				
+				var vm = new CommentView();
+				vm.ObjectId = comment.ObjectId;
 				vm.Comments = await new Comments() { OrgId = _data.CurrentOrg.Id, ObjectType = comment.ObjectType, ObjectIds = new int[] { comment.ObjectId } }.ExecuteAsync(cn);
 				return PartialView("/Pages/Dashboard/Items/_Comments.cshtml", vm);
 			}
@@ -272,6 +293,12 @@ namespace Ginseng.Mvc.Controllers
 			{
 				return Json(new { success = false, message = exc.Message });
 			}
+		}
+
+		[HttpGet]
+		public async Task<PartialViewResult> Attachments(int id)
+		{
+			throw new NotImplementedException();
 		}
 	}
 }

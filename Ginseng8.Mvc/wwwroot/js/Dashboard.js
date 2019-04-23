@@ -96,16 +96,31 @@ projectUpdateFields.forEach(function (ele) {
     });
 });
 
-var htmlEditLinks = document.querySelectorAll('.editHtml');
-htmlEditLinks.forEach(function (e) {
-    e.addEventListener("click", function (e) {
-        var id = e.target.getAttribute("data-id");
-        var idPrefix = e.target.getAttribute('data-id-prefix');
-        $("#" + idPrefix + '-view-' + id).hide();
-        $("#" + idPrefix + '-edit-' + id).show();
-        $("#" + idPrefix + '-content-' + id).focus(); // doesn't work because this textarea is hidden by the editor
-        $(e.target).hide();
-    });
+$(document)
+.on('click', '.editHtml', function(event) {
+    event.preventDefault();
+
+    var $target = $(event.target);
+    var idPrefix = $target.attr('data-id-prefix');
+    var id = $target.attr('data-id');
+
+    $target.hide();
+    $('#' + idPrefix + '-edit-' + id).show();
+    $('#' + idPrefix + '-view-' + id).hide();
+    $('#' + idPrefix + '-content-' + id).froalaEditor('events.focus');
+})
+.on('click', '.cancelHtmlEdit', function(event) {
+    event.preventDefault();
+})
+
+$('.htmlEditor').on('froalaEditor.image.beforeUpload', function(event, editor, images) {
+    console.group('before upload image, update params');
+    editor.opts.imageUploadParams = {
+        'folderName': $(event.target).data('folder-name'),
+        'id': Number($(event.target).data('id')),
+    }
+    console.log(editor.opts.imageUploadParams);
+    console.groupEnd();
 });
 
 var htmlCancelEditLinks = document.querySelectorAll('.cancelHtmlEdit');
@@ -205,6 +220,9 @@ selfStartLinks.forEach(function (ele) {
         var element = ev.target;
         if (element.tagName == 'I') element = element.parentElement;
 
+        var loading = $(element).find('img');
+        $(loading).show();
+
         var data = {
             id: element.getAttribute('data-number'),
             activityId: element.getAttribute('data-activity-id')
@@ -215,9 +233,16 @@ selfStartLinks.forEach(function (ele) {
         fetch('/WorkItem/SelfStartActivity', {
             method: 'post',
             body: formData
-        }).then(function (response) {
-            // show success/fail or something?
+        }).then(function (response) {            
             return response.json();
+        }).then(function (result) {
+            $(loading).hide();
+            $(ev.target).hide();
+            if (result.success) {
+                $(ev.target).nextAll('.success').show();
+            } else {
+                $(ev.target).next('.error').show();
+            }
         });
     });
 });
@@ -225,18 +250,55 @@ selfStartLinks.forEach(function (ele) {
 var resumeWorkLinks = document.querySelectorAll('.resume-work-item');
 resumeWorkLinks.forEach(function (ele) {
     ele.addEventListener('click', function (ev) {
+        var loading = $(ev.target).find('img');
+        $(loading).show();
+
         var data = {
             id: ev.target.getAttribute('data-number')
         };
 
         var formData = getFormData(data);
-
         fetch('/WorkItem/ResumeActivity', {
             method: 'post',
             body: formData
         }).then(function (response) {
-            // show success/fail or something?
             return response.json();
+        }).then(function (result) {
+            $(loading).hide();
+            $(ev.target).hide();
+            if (result.success) {
+                $(ev.target).nextAll('.success').show();
+            } else {
+                $(ev.target).next('.error').show();
+            }
+        });
+    });
+});
+
+var cancelWorkLinks = document.querySelectorAll('.cancel-activity');
+cancelWorkLinks.forEach(function (ele) {
+    ele.addEventListener('click', function (ev) {
+        var loading = $(ev.target).find('img');
+        $(loading).show();
+
+        var data = {
+            id: ev.target.getAttribute('data-number')
+        };
+
+        var formData = getFormData(data);
+        fetch('/WorkItem/CancelActivity', {
+            method: 'post',
+            body: formData
+        }).then(function (response) {
+            return response.json();
+        }).then(function (result) {
+            $(loading).hide();
+            $(ev.target).hide();
+            if (result.success) {
+                $(ev.target).nextAll('.success').show();
+            } else {
+                $(ev.target).next('.error').show();
+            }
         });
     });
 });
@@ -244,6 +306,9 @@ resumeWorkLinks.forEach(function (ele) {
 var unassignWorkLinks = document.querySelectorAll('.unassign-work-item');
 unassignWorkLinks.forEach(function (ele) {
     ele.addEventListener('click', function (ev) {
+        var loading = $(ev.target).find('img');
+        $(loading).show();
+
         var data = {
             id: ev.target.getAttribute('data-number')
         };
@@ -252,22 +317,14 @@ unassignWorkLinks.forEach(function (ele) {
             method: 'post',
             body: formData
         }).then(function (response) {
-            // show success/fail or something?
             return response.json();
-        });
-    });
-});
-
-var addCommentButtons = document.querySelectorAll('.addComment');
-addCommentButtons.forEach(function (ele) {
-    ele.addEventListener('click', function (ev) {
-        var button = $(ev.target).closest('.addComment')[0];
-        var target = button.getAttribute('data-target');
-        var div = document.getElementById(target);
-        $(div).slideToggle('fast', function () {
-            if ($(div).is(':visible')) {
-                var field = document.getElementById(target + '-HtmlBody');
-                field.focus();
+        }).then(function (result) {
+            $(loading).hide();
+            $(ev.target).hide();
+            if (result.success) {
+                $(ev.target).nextAll('.success').show();
+            } else {
+                $(ev.target).next('.error').show();
             }
         });
     });
@@ -286,7 +343,21 @@ $(document)
         return response.text();
     }).then(function (html) {
         var objectId = frm.ObjectId.value;
-        $('#comments-' + objectId + '-output').first().html(html);
+        var objectType = frm.ObjectType.value;
+        $('#comments-' + objectId + '-' + objectType + '-output').first().html(html);
+    });
+})
+.on('click', '.addComment', function(event) {
+    event.preventDefault();
+
+    var button = $(event.target).closest('.addComment')[0];
+    var target = button.getAttribute('data-target');
+    var div = document.getElementById(target);
+    $(div).slideToggle('fast', function () {
+        if ($(div).is(':visible')) {
+            var field = document.getElementById(target + '-HtmlBody');
+            field.focus();
+        }
     });
 });
 
@@ -298,25 +369,22 @@ noPropagateItems.forEach(function (ele) {
 });
 
 $(document).ready(function () {
-    $('.nav-tabs li:first-child a').tab('show');
-
+    var hash = window.location.hash;
+    if (hash) {
+        var workItemNum = hash.substring(1);
+        var workItemAnchor = $('a[name=' + workItemNum + ']');
+        var tabId = workItemAnchor.parents('.tab-pane').data('tab-id');
+        $('#' + tabId).tab('show');        
+    } else {
+        // no current work item, so show first tab by default
+        $('.nav-tabs li:first-child a').tab('show');
+    }
+    
     InitWorkItemSortable();
     initDraggableItems();
     InitProjectCrosstabWorkItemDroppable();
     InitTableBodySortable();
 });
-
-function sortableStart(event, ui) {
-    // This event is triggered when sorting starts.
-    $('.ui-sortable-placeholder').outerHeight($(ui.item).outerHeight()); // update height of placeholder to current item height
-    $('body').addClass('dragging');
-}
-
-function sortableStop() {
-    setTimeout(function() {
-        $('body').removeClass('dragging');
-    });
-}
 
 function InitTableBodySortable() {
     $('.js-table-body-sortable').sortable({
@@ -504,17 +572,3 @@ function projectCrosstabWorkItemUpdate(data) {
         return response.json();
     });
 }
-
-function getFormData(object) {
-    var formData = new FormData();
-    for (var key in object) formData.append(key, object[key]);
-    formData.append("__RequestVerificationToken", getAntiForgeryToken());
-    return formData;
-}
-
-function getAntiForgeryToken() {
-    var div = document.getElementById('antiForgeryToken');
-    var input = div.getElementsByTagName('input')[0];
-    return input.value;
-}
-

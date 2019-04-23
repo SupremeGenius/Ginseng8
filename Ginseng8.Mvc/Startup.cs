@@ -1,9 +1,12 @@
 using Ginseng.Mvc.Data;
+using Ginseng.Mvc.Interfaces;
+using Ginseng.Mvc.Services;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Identity.UI;
+using Microsoft.AspNetCore.Identity.UI.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -32,11 +35,28 @@ namespace Ginseng.Mvc
 
 			services.AddDbContext<ApplicationDbContext>(options =>
 				options.UseSqlServer(
-					Configuration.GetSection("ConnectionStrings").GetValue<string>("Default")
-					/*Configuration.GetConnectionString("DefaultConnection")*/));
-			services.AddDefaultIdentity<IdentityUser>()
+					Configuration.GetSection("ConnectionStrings").GetValue<string>("Default")));
+
+			services
+				.AddTransient<IUserStore<IdentityUser>, ExUserStore>()
+				.AddTransient<IUserLoginStore<IdentityUser>, ExUserStore>()
+				.AddDefaultIdentity<IdentityUser>(ConfigureIdentity)
 				.AddDefaultUI(UIFramework.Bootstrap4)
 				.AddEntityFrameworkStores<ApplicationDbContext>();
+
+			services.AddAuthentication()
+				.AddGoogle(options =>
+				{
+					options.ClientId = Configuration.GetSection("Google").GetValue<string>("ClientId");
+					options.ClientSecret = Configuration.GetSection("Google").GetValue<string>("ClientSecret");
+				})
+				.AddCookie()
+				.AddAerieHub(Configuration)
+				.AddGitHub(Configuration);
+
+			services
+				.AddTransient<IEmailSender, Email>()
+				.AddSingleton<IViewRenderService, ViewRenderService>();
 
 			services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 		}
@@ -47,7 +67,7 @@ namespace Ginseng.Mvc
 			if (env.IsDevelopment())
 			{
 				app.UseDeveloperExceptionPage();
-				app.UseDatabaseErrorPage();				
+				app.UseDatabaseErrorPage();
 			}
 			else
 			{
@@ -66,6 +86,13 @@ namespace Ginseng.Mvc
 			{
 				routes.MapRoute(name: "default", template: "{controller=Home}/{action=Index}/{id?}");
 			});
+		}
+
+		private void ConfigureIdentity(IdentityOptions options)
+		{
+			// Requiring a confirmed email breaks external logins.
+			//options.SignIn.RequireConfirmedEmail = true;
+			options.User.RequireUniqueEmail = false;
 		}
 	}
 }

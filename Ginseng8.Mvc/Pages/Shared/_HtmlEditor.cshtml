@@ -6,7 +6,14 @@
 <div id="@Model.IdPrefix-edit-@Model.Id" style="display:none">
     <form>
         <input type="hidden" name="Id" value="@Model.Id" />
-        <textarea name="HtmlBody" id="@(Model.IdPrefix)-content-@(Model.Id)" class="htmlEditor">@Model.Content</textarea>
+        @if (Model.PostFields != null)
+        {
+            foreach (var keyPair in Model.PostFields)
+            {
+                <input type="hidden" name="@keyPair.Key" value="@keyPair.Value"/>
+            }
+        }
+        <textarea name="HtmlBody" id="@(Model.IdPrefix)-content-@(Model.Id)" class="htmlEditor" data-id="@Model.UploadId" data-folder-name="@Model.UploadFolderName">@Model.Content</textarea>
         <button type="button" class="btn btn-sm btn-secondary my-2 saveHtmlEdit" data-id-prefix="@Model.IdPrefix" data-id="@Model.Id" data-post-url="@Model.PostUrl">Update</button>
         <a class="cancelHtmlEdit" href="#" data-id="@Model.Id" data-id-prefix="@Model.IdPrefix">Cancel</a>
     </form>
@@ -18,6 +25,7 @@
     {
         <a class="addComment btn btn-sm btn-light" href="#" data-id="@Model.Id" id="addCommentLink-@Model.IdPrefix-@Model.Id" data-target="addComment-@Model.Id" data-id-prefix="@Model.IdPrefix" title="Add comment">
             <i class="far fa-comment-plus"></i>
+            Add Comment
         </a>
     }    
 </div>

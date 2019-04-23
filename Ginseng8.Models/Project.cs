@@ -13,7 +13,7 @@ namespace Ginseng.Models
 	/// <summary>
 	/// A collection of work items centered around a single goal, feature, or some other unifying idea
 	/// </summary>
-	public class Project : BaseTable, IBody
+	public class Project : BaseTable, IBody, IFindRelated<int>
 	{
 		[References(typeof(Application))]
 		[PrimaryKey]
@@ -31,6 +31,9 @@ namespace Ginseng.Models
 		/// </summary>
 		public int? Priority { get; set; }
 
+		/// <summary>
+		/// Source code location
+		/// </summary>
 		[MaxLength(255)]
 		public string BranchUrl { get; set; }
 
@@ -43,9 +46,21 @@ namespace Ginseng.Models
 
 		public bool IsActive { get; set; } = true;
 
+		public Application Application { get; set; }
+
 		public override async Task AfterSaveAsync(IDbConnection connection, SaveAction action, IUser user)
 		{
 			if (action == SaveAction.Update) await SyncWorkItemsToProjectAsync(connection);
+		}
+
+		public void FindRelated(IDbConnection connection, CommandProvider<int> commandProvider)
+		{
+			Application = commandProvider.Find<Application>(connection, ApplicationId);
+		}
+
+		public async Task FindRelatedAsync(IDbConnection connection, CommandProvider<int> commandProvider)
+		{
+			Application = await commandProvider.FindAsync<Application>(connection, ApplicationId);
 		}
 
 		public async Task SyncWorkItemsToProjectAsync(IDbConnection connection)

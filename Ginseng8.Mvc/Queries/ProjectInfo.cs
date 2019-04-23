@@ -1,8 +1,11 @@
-﻿using Postulate.Base;
+﻿using Ginseng.Mvc.ViewModels;
+using Postulate.Base;
 using Postulate.Base.Attributes;
+using Postulate.Base.Interfaces;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel;
+using System.Data;
 
 namespace Ginseng.Mvc.Queries
 {
@@ -14,6 +17,9 @@ namespace Ginseng.Mvc.Queries
 		public string Name { get; set; }
 		public string Description { get; set; }
 		public int? Priority { get; set; }
+		public string PriorityTier { get; set; }
+		public int? TierRank { get; set; }
+		public int? MaxProjects { get; set; }
 		public string BranchUrl { get; set; }
 		public string TextBody { get; set; }
 		public string HtmlBody { get; set; }
@@ -25,13 +31,25 @@ namespace Ginseng.Mvc.Queries
 		public int? TotalWorkItems { get; set; }
 		public int? OpenWorkItems { get; set; }
 		public int? ClosedWorkItems { get; set; }
+		public int? UnestimatedWorkItems { get; set; }
+		public int? StoppedWorkItems { get; set; }
+		public int? ImpededWorkItems { get; set; }
 		public float PercentComplete { get; set; }
 		public bool AllowDelete { get; set; }
-		public int? EstimateHours { get; set; }
+		public int? EstimateHours { get; set; }		
+
+		public bool HasModifiers()
+		{
+			return
+				ImpededWorkItems > 0 ||
+				UnestimatedWorkItems > 0 ||
+				StoppedWorkItems > 0;
+		}
 	}
 
 	public enum ProjectInfoSortOptions
 	{
+		Priority,
 		Name,
 
 		[Description("Open work items")]
@@ -58,21 +76,36 @@ namespace Ginseng.Mvc.Queries
 		NoOpenItems
 	}
 
-	public class ProjectInfo : Query<ProjectInfoResult>
+	public class ProjectInfo : Query<ProjectInfoResult>, ITestableQuery
 	{
-		public ProjectInfo(ProjectInfoSortOptions sort = ProjectInfoSortOptions.Name) : base(
-			$@"WITH [source] AS (
+		private static string BaseSql(ProjectInfoSortOptions sort = ProjectInfoSortOptions.Priority)
+		{
+			return $@"WITH [source] AS (
 				SELECT
 					[p].*,
+					[ptr].[Name] AS [PriorityTier],
+					[ptr].[Rank] AS [TierRank],
+					[ptr].[MaxProjects] AS [MaxProjects],
 					[app].[Name] AS [ApplicationName],
 					(SELECT 
 						SUM(COALESCE([wid].[EstimateHours], [sz].[EstimateHours])) 
 						FROM [dbo].[WorkItem] [wi] LEFT JOIN [dbo].[WorkItemSize] [sz] ON [wi].[SizeId]=[sz].[Id] 
 						LEFT JOIN [dbo].[WorkItemDevelopment] [wid] ON [wi].[Id]=[wid].[WorkItemId]
-						WHERE [wi].[ProjectId]=[p].[Id]) AS [EstimateHours],
+						WHERE [wi].[ProjectId]=[p].[Id] AND [wi].[CloseReasonId] IS NULL) AS [EstimateHours],
 					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id]) AS [TotalWorkItems],
 					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id] AND [CloseReasonId] IS NULL) AS [OpenWorkItems],
 					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id] AND [CloseReasonId] IS NOT NULL) AS [ClosedWorkItems],
+					(SELECT COUNT(1) 
+						FROM 
+							[dbo].[WorkItem] [wi]
+							LEFT JOIN [dbo].[WorkItemDevelopment] [wid] ON [wi].[Id]=[wid].[WorkItemId]
+							LEFT JOIN [dbo].[WorkItemSize] [sz] ON [wi].[SizeId]=[sz].[Id] 
+						WHERE 
+							[ProjectId]=[p].[Id] AND [CloseReasonId] IS NULL AND
+							COALESCE([wid].[EstimateHours], [sz].[EstimateHours]) IS NULL) AS [UnestimatedWorkItems],
+					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id] AND [CloseReasonId] IS NULL AND [MilestoneId] IS NOT NULL AND [ActivityId] IS NULL) AS [StoppedWorkItems],
+					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id] AND [CloseReasonId] IS NULL AND [MilestoneId] IS NULL) AS [UnscheduledWorkItems],
+					(SELECT COUNT(1) FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id] AND [CloseReasonId] IS NULL AND [HasImpediment]=1) AS [ImpededWorkItems],
 					CASE
 						WHEN EXISTS(SELECT 1 FROM [dbo].[WorkItem] WHERE [ProjectId]=[p].[Id]) THEN 0
 						WHEN [p].[HtmlBody] IS NOT NULL THEN 0
@@ -81,6 +114,9 @@ namespace Ginseng.Mvc.Queries
 				FROM
 					[dbo].[Project] [p]
 					INNER JOIN [dbo].[Application] [app] ON [p].[ApplicationId]=[app].[Id]
+					LEFT JOIN [dbo].[FnPriorityTierRanges](@orgId) [ptr] ON
+						[p].[Priority] >= [ptr].[MinPriority] AND
+						[p].[Priority] <= [ptr].[MaxPriority]
 				WHERE
 					[app].[OrganizationId]=@orgId 					
 					{{andWhere}}
@@ -89,10 +125,17 @@ namespace Ginseng.Mvc.Queries
 				CASE
 					WHEN [TotalWorkItems] > 0 THEN CONVERT(float, [ClosedWorkItems]) / CONVERT(float, [TotalWorkItems])
 					ELSE 0
-				END AS [PercentComplete]
+				END AS [PercentComplete]				
 			FROM
 				[source]
-			ORDER BY {SortOptions[sort]}")
+			ORDER BY {SortOptions[sort]}";
+		}
+
+		public ProjectInfo() : base(BaseSql(ProjectInfoSortOptions.Priority))
+		{
+		}
+
+		public ProjectInfo(ProjectInfoSortOptions sort = ProjectInfoSortOptions.Priority) : base(BaseSql(sort))
 		{
 		}
 
@@ -120,6 +163,7 @@ namespace Ginseng.Mvc.Queries
 			{
 				return new Dictionary<ProjectInfoSortOptions, string>()
 				{
+					{ ProjectInfoSortOptions.Priority, "[Priority] ASC, [Name] ASC" },
 					{ ProjectInfoSortOptions.Name, "[Name] ASC" },
 					{ ProjectInfoSortOptions.OpenWorkItems, "[OpenWorkItems] DESC" },
 					{ ProjectInfoSortOptions.TotalWorkItems, "[TotalWorkItems] DESC" },
@@ -127,6 +171,22 @@ namespace Ginseng.Mvc.Queries
 					{ ProjectInfoSortOptions.EstimateHours, "[EstimateHours] DESC" }
 				};
 			}
+		}
+
+		public IEnumerable<dynamic> TestExecute(IDbConnection connection)
+		{
+			return TestExecuteHelper(connection);
+		}
+
+		public IEnumerable<ITestableQuery> GetTestCases()
+		{
+			yield return new ProjectInfo() { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.Name) { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.Priority) { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.OpenWorkItems) { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.TotalWorkItems) { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.PercentComplete) { OrgId = 0 };
+			yield return new ProjectInfo(ProjectInfoSortOptions.EstimateHours) { OrgId = 0 };
 		}
 	}
 }

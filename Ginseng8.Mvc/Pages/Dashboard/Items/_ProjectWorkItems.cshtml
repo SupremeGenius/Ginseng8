@@ -7,7 +7,7 @@
         foreach (var projectGrp in appGrp.OrderBy(row => row.ProjectName).GroupBy(row => row.ProjectId))
         {
             var projectItem = projectGrp.First();
-            <h5>@projectItem.ProjectName</h5>            
+            <h5><span class="editable" id="project-name-@projectGrp.Key">@projectItem.ProjectName</span></h5>
 
             @if (projectGrp.Key != 0)
             {
@@ -18,8 +18,8 @@
                         <partial name="Items/_ProjectInfo" model="Model.SelectedProjectInfo"/>                                                
                     </div>                    
                     
-                    @await Html.PartialAsync("Shared/_HtmlEditor", new HtmlEditorView() { Id = projectGrp.Key, IdPrefix = "project", PostUrl = "/Update/ProjectBody", Content = Model.SelectedProject.HtmlBody, AllowComments = true })
-                    <div id="comments-@Model.SelectedProject.Id-output">
+                    @await Html.PartialAsync("Shared/_HtmlEditor", new HtmlEditorView() { Id = projectGrp.Key, IdPrefix = "prj", PostUrl = "/Update/ProjectBody", Content = Model.SelectedProject.HtmlBody, UploadFolderName = "Projects", AllowComments = true })
+                    <div id="comments-@Model.SelectedProject.Id-Project-output">
                     @await  Html.PartialAsync("/Pages/Dashboard/Items/_Comments.cshtml", new CommentView() { Comments = Model.ProjectComments, ObjectId = Model.SelectedProject.Id, ObjectType = ObjectType.Project })
                     </div>
                 </div>                
@@ -50,12 +50,3 @@
         }
     }
 </div>
-
-@{ 
-    var recentlyClosed = Model.ClosedItems[Model.SelectedProject.Id].Take(10);                                    
-}               
-@if (recentlyClosed.Any())
-{
-    <partial name="Items/_RecentlyClosed" model="recentlyClosed"/>
-}
-

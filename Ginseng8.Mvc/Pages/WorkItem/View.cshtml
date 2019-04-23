@@ -1,7 +1,13 @@
 ﻿@page "/WorkItem/View/{id}"
 @model Ginseng.Mvc.Pages.WorkItem.ViewModel
 @{
-    ViewData["Title"] = "Edit";
+    ViewData["Title"] = "Work Item";
+    var cardView = new WorkItemCardView() { WorkItem = Model.Item, Dropdowns = Model.Dropdowns, SelectedLabels = Model.SelectedLabels[Model.Item.Id], UserId = Model.UserId, Comments = Model.Comments[Model.Item.Id], ShowDetailsButton = false };
+}
+
+@section Head {
+    <link rel="stylesheet" href="~/lib/dropzone/basic.css"/>
+    <link rel="stylesheet" href="~/lib/dropzone/dropzone.css"/>
 }
 
 <div class="row">
@@ -11,7 +17,24 @@
         </h2>
     </div>
     <div class="col-10">
-        <h2>@Model.Item.Title</h2>
+        <h2><span class="editable" id="title-@Model.Item.Number">@Model.Item.Title</span></h2>        
+    </div>
+</div>
+<div class="row mb-2">
+    <div class="col-2"></div>
+    <div class="col-8">
+        <partial name="Dashboard/Items/_LabelControls" model="cardView"/>
+    </div>
+    <div class="col-2">
+        <partial name="/Pages/Dashboard/Items/_Status.cshtml" model="cardView"/>
+    </div>
+</div>
+
+<div class="row">
+    <div class="col-2"></div>
+    <div class="col-10">
+        <partial name="/Pages/Dashboard/Items/_ItemInner.cshtml" model="cardView"/>
+        <hr />
     </div>
 </div>
 
@@ -19,13 +42,26 @@
     <div class="col-2"></div>
     <div class="col-10">
 
-    </div>
-</div>
+        <ul>
+            @foreach (var att in Model.Attachments)
+            {
+                <li class="mb-2">
+                    <a href="@att.Url">@att.DisplayName</a>
+                    @if (att.AllowDelete)
+                    {                        
+                        <form method="post" asp-page-handler="DeleteAttachment" class="d-inline-block">
+                            <input type="hidden" name="Id" value="@att.Id"/>
+                            <button class="btn btn-sm" onclick="return confirm('This will delete the attachment.')">Delete...</button>
+                        </form>                        
+                    }
+                </li>
+            }
+        </ul>
 
-<div class="row">
-    <div class="col-2"></div>
-    <div class="col-10">
-        <partial name="/Pages/Dashboard/Items/_ItemInner.cshtml" model="new WorkItemCardView() { WorkItem = Model.Item, Dropdowns = Model.Dropdowns, SelectedLabels = Model.SelectedLabels[Model.Item.Id], UserId = Model.UserId, Comments = Model.Comments[Model.Item.Id] }"/>
+        <form asp-controller="Upload" asp-action="Attachment" method="post" class="dropzone" id="frmDropzone">            
+            <input type="hidden" name="Id" value="@Model.Item.Number"/>
+            <input type="hidden" name="FolderName" value="WorkItems"/>
+        </form>
         <hr />
     </div>
 </div>
@@ -34,4 +70,20 @@
 
 @section Scripts {
     <script src="~/js/Dashboard.js"></script>
+    <script src="~/lib/dropzone/min/dropzone.min.js"></script>
+    <script>
+        $(document).ready(function () {
+            $('.editable').editable('/Update/WorkItemTitle', {
+                id: 'elementId',
+                name: 'newTitle'
+            });
+
+            var dz = $('.dropzone');
+            dz.on('success', function (file) {
+                // need some indication that file was uploaded
+                // to trigger refresh of attachment list
+                console.log(file);
+            });
+        })
+    </script>
 }

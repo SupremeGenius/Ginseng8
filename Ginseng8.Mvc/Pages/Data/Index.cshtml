@@ -87,7 +87,7 @@
                 }
                 </span>
             </h5>
-            @await Html.PartialAsync("Shared/_HtmlEditor", new HtmlEditorView() { Id = Model.Id, IdPrefix = "model-class", PostUrl = "/Update/ModelClassBody", Content = Model.CurrentClass.HtmlBody })
+            @await Html.PartialAsync("Shared/_HtmlEditor", new HtmlEditorView() { Id = Model.Id, IdPrefix = "model-class", PostUrl = "/Update/ModelClassBody", Content = Model.CurrentClass.HtmlBody, UploadFolderName = "DataModels" })
 
             var grid = new GridEditor<ModelProperty>(this, Xsrf, defaults: new { ModelClassId = Model.CurrentClass.Id, Position = Model.Properties.Count() + 1 });
 
@@ -141,7 +141,7 @@
             }
 
             @if (Model.Children.Any())
-                    {
+            {
                 <h6>Child Classes</h6>
                 <ul>
                     @foreach (var child in Model.Children)
@@ -151,7 +151,7 @@
                                 <span>@child.PropertyName</span>
                                 <span class="small text-muted">
                                 @if (child.RelationshipType == RelationshipType.OneToOne)
-                    {
+                                {
                                     <text>one-to-one</text>
                                 }
                                 else
