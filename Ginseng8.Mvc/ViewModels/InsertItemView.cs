@@ -8,25 +8,27 @@ namespace Ginseng.Mvc.ViewModels
 {
 	public class InsertItemView
 	{
-		private readonly Dictionary<string, int> _contextValues;
-
 		public InsertItemView(Dictionary<string, int> contextValues)
 		{			
-			_contextValues = contextValues;
+			ContextValues = contextValues;
 		}
 
 		public string Context
 		{
 			get
 			{
-				return string.Join("-", _contextValues.Select(kp => $"{kp.Key}-{kp.Value}"));
+				return string.Join("-", ContextValues.Select(kp => $"{kp.Key}-{kp.Value}"));
 			}
 		}
+
+		public Dictionary<string, int> ContextValues { get; }
+
+		public CommonDropdowns Dropdowns { get; set; }
 
 		public IHtmlContent WriteContextFields(IHtmlHelper html)
 		{			
 			// filter out zeroes from fields because they are FK violations
-			foreach (var kp in _contextValues.Where(kp => kp.Value != 0))
+			foreach (var kp in ContextValues.Where(kp => kp.Value != 0))
 			{
 				TagBuilder input = new TagBuilder("input");
 				input.MergeAttribute("type", "hidden");

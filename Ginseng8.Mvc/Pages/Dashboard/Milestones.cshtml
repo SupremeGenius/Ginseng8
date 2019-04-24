@@ -62,7 +62,7 @@
                 {
                     { "applicationId", appGrp.Key },
                     { "milestoneId", milestoneGrp.Key }
-                }))
+                }) { Dropdowns = Model.Dropdowns })
             </div>
             @{ 
                 var recentlyClosed = Model.ClosedItems[milestoneGrp.Key].Take(10);

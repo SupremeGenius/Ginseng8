@@ -16,6 +16,9 @@
             </div>
             <div class="form-row">
                 <div class="col-12" style="display:none" id="item-detail-@Model.Context">
+                    <div class="mb-2">
+                        <partial name="Items/_ItemControls" model="@(new WorkItemCardView() { Dropdowns = Model.Dropdowns, WorkItem = new OpenWorkItemsResult() { ApplicationId = Model.ContextValues["applicationId"] } })"/>
+                    </div>                    
                     <textarea name="HtmlBody" class="htmlEditor"></textarea>
                 </div>
             </div>
